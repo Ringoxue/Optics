@@ -1,0 +1,2133 @@
+RFD 9 99 999 9999 99999 999999 9999999 99999999 999999999
+
+GBL NUM ^CDGM  ! # of BUF cdgm.dat !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+GBL STR ^INT(0000..1111) ! Syntax sugar from integer to string !!!!!!!!!!!!!!!!
+
+! Default globally available variables
+GBL STR ^RGX_CMD(0..#2, 0..#2)
+GBL NUM ^RGX_DAT(0..#2, 0..#2)
+
+GBL STR ^RGX_STR(0..#2, 0..#2)
+GBL NUM ^RGX_NUM(0..#2, 0..#2)
+
+GBL STR ^RGX_ARG(9)
+
+GBL NUM ^DEBUG
+GBL NUM ^RTN
+GBL NUM ^BAD
+
+! Temp storage return value of functions
+GBL NUM ^OK
+GBL NUM ^KO
+
+! Global string storing CV directories
+GBL STR ^CD
+GBL STR ^CV
+
+GBL STR ^USR
+GBL STR ^USP
+GBL STR ^UDS
+
+GBL STR ^GE  ! Command string of Glass Expert for easy using
+GBL STR ^PUSH ! Command string pushing to new line of current buffer
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Start up settings !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+DDM M
+RDM YES
+
+PTH YES
+  PTH SEQ APP CV_MACRO:
+  PTH SEQ APP CV_LENS:
+  PTH SEQ APP CVUSER:
+
+  PTH LEN CV_LENS:
+
+  PTH SEQ APP CVUSER:MACRO
+  IN FLD.SEQ
+
+! Initialize CV directories strings
+^CD == (CD)
+CD ^CD
+
+! Initialize integer to string array
+FOR ^I 0000 0999
+  ^INT(^I) == SUBSTR( NUM_TO_STR( ^I + 1000 ), 2, 3 )
+END FOR
+
+FOR ^I 1000 1099
+  ^INT(^I) == SUBSTR(       ^INT( ^I - 1000 ), 2, 2 )
+END FOR
+
+FOR ^I 1100 1109
+  ^INT(^I) == SUBSTR(       ^INT( ^I - 0100 ), 2, 1 )
+END FOR
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!CD CV:
+!!^CV == (CD)
+!!
+!!CD CV:UMR\USR  ! Work around of DLL file locating issue in USR
+!!  ^USR == (CD)
+!!CD CV:UMR\USP
+!!  ^USP == (CD)
+!!CD CV:UMR\UDS
+!!  ^UDS == (CD)
+!!
+!!CD ^USR
+!!  IN Initializations #1 #2 #3 #4 #5 #6 #7 #8 #9
+!!CD ^CD
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Fundamental CV functions declaration
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+! Single line function definition will throw undefined BUG in CV108
+@BUG == 9527
+
+! Return maximum # of Z
+@MZ == 99
+
+! Return maximum # of F
+@MF == 25
+
+! Return maximum # of W
+@MW == 21
+
+! Return maximum # of S
+@MS == 990
+
+! Get scale factor of dimension to millimeter
+@DIM == ('M' = (DIM)) * 1.00 + ('C' = (DIM)) * 10.0 + ('I' = (DIM)) * 25.4
+
+! Request an empty buffer #
+FCT @BUF
+  LCL NUM ^BUF!^BUF == 1?Keep and continue 
+
+  UNT
+    ^BUF == ^BUF + 1
+  END UNT (BUF.EMP B^BUF)
+END FCT ^BUF
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Fundamental math functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+! Get constant PI
+@PI == ACOSF( -1 )!4 * ATANF(1)
+
+! Get constant scale factor of pound to gram
+@LB == 453.59237
+
+! Get largest number allowed in CODE V
+@INF == TANF( ATANF( 1 ) * 2 )
+
+! Get smallest number allowed in CODE V
+@EPS == 1.0 / @INF
+
+
+! Wrap of built-in power operator ** to avoid bug in -^N**^M & make ^N**0 always 1
+FCT @POW( NUM ^N, NUM ^M )
+  LCL NUM ^POW
+  IF ^M
+    ^POW == ^N**^M
+  ELS
+    ^POW == 1
+  END IF
+END FCT ^POW
+
+! Arbitrary based Log
+FCT @LOG( NUM ^N, NUM ^M )
+  LCL NUM ^LOG
+  IF (^N > 0) AND (^M > 0)
+    ^LOG == LOGF( ^M ) / LOGF( ^N )
+  ELS
+    ^LOG == 0
+  END IF
+END FCT ^LOG
+
+
+! Absolute integer by ROUNDF( ABSF() )
+FCT @AI( NUM ^N )
+END FCT ROUNDF( ABSF( ^N ) )
+
+! Floating-safe less
+FCT @LS( NUM ^A, NUM ^B, NUM ^C )
+END FCT     (^A - ^B) < -@EPS * 10**^C
+
+! Floating-safe less-equal
+FCT @LE( NUM ^A, NUM ^B, NUM ^C )
+END FCT     (^A - ^B) < +@EPS * 10**^C
+
+! Floating-safe equal
+FCT @EQ( NUM ^A, NUM ^B, NUM ^C )
+END FCT ABSF(^A - ^B) < +@EPS * 10**^C
+
+! Floating-safe not-equal
+FCT @NE( NUM ^A, NUM ^B, NUM ^C )
+END FCT ABSF(^A - ^B) > +@EPS * 10**^C
+
+! Floating-safe greater
+FCT @GT( NUM ^A, NUM ^B, NUM ^C )
+END FCT     (^A - ^B) > +@EPS * 10**^C
+
+! Floating-safe greater-equal
+FCT @GE( NUM ^A, NUM ^B, NUM ^C )
+END FCT     (^A - ^B) > -@EPS * 10**^C
+
+
+! Floating-safe equal to 0
+FCT @ISZ( NUM ^N )
+END FCT @EQ( ^N, 0, 1 )
+
+! ^A ? ^B : ^C
+FCT @IE( NUM ^A, NUM ^B, NUM ^C )
+END FCT ^B * (^A <> 0) + (0 = ^A) * ^C
+
+! ^A / ^B : ^C
+FCT @DO( NUM ^A, NUM ^B, NUM ^C )
+  NUM ^DO
+
+  IF ^B
+    ^DO == ^A / ^B
+  ELSE
+    ^DO == ^C
+  END IF
+END FCT ^DO
+
+! Distance MIN
+FCT @MN( NUM ^A, NUM ^B, NUM ^C )
+END FCT @IE( (^A - ^B + ^A - ^C) * (^B - ^C) > 0, ^B, ^C )
+
+! Distance MAX
+FCT @MX( NUM ^A, NUM ^B, NUM ^C )
+END FCT @IE( (^A - ^B + ^A - ^C) * (^B - ^C) > 0, ^C, ^B )
+
+! ^B < ^A < ^C
+! Return 0 if in or the nearest distance
+FCT @IN( NUM ^A, NUM ^B, NUM ^C )
+  ^C == ^A - ^C
+  ^B == ^A - ^B
+  ^A == @IE( ^B**2 < ^C**2, ^B, ^C )
+END FCT @IE( ^C * ^B > 0, ^A, 0 )
+
+! ^B | ^A | ^C
+!!! @OF( NUM ^A, NUM ^B, NUM ^C )
+ !^C == ^A - ^C
+ !^B == ^A - ^B
+!!! FCT ^A - (^B * ^C > 0) * @IE( ^B * ^B < ^C * ^C, ^B, ^C )
+!!!!!!! ^A - @IE( ^B * ^C > 0, @IE( ^B * ^B < ^C * ^C, ^B, ^C ), 0 )  ! Bug of nested FCT
+
+
+! Return sign (+1 / 0 / -1) of the given value
+FCT @SGN( NUM ^N )
+END FCT (^N > 0) - (^N < 0)  !!  @GT( ^N, 0, 3 ) - @LS( ^N, 0, 3 )
+
+! <=> than switch
+FCT @LEG( NUM ^T, NUM ^L, NUM ^E, NUM ^G )
+  LCL NUM ^LEG(-1..+1)
+  ^LEG(-1) == ^L
+  ^LEG(00) == ^E
+  ^LEG(+1) == ^G
+END FCT ^LEG(@SGN( ^T ))
+
+! Get nearest integer not greater in magnitude than the given value
+FCT @TRUNC( NUM ^N )
+END FCT ROUNDF( ^N - .5 * @SGN( ^N ) )
+
+! Get nearest integer not greater than the given value
+FCT @FLOOR( NUM ^N )
+  LCL NUM ^FLOOR
+  ^FLOOR == ROUNDF( ^N )
+
+  IF ^FLOOR > ^N
+    ^FLOOR == ^FLOOR - 1
+  END IF
+END FCT ^FLOOR
+
+! Get nearest integer not less than the given value
+FCT @CEIL( NUM ^N )
+  LCL NUM ^CEIL
+  ^CEIL == ROUNDF( ^N )
+
+  IF ^CEIL < ^N
+    ^CEIL == ^CEIL + 1
+  END IF
+END FCT ^CEIL
+
+! Get magnitude of number
+FCT @M( NUM ^N )
+  IF ^N
+    ^N == @FLOOR( LOG10F( ABSF( ^N ) ) )
+  END IF
+END FCT ^N
+
+! Get factor of number
+FCT @N( NUM ^M )
+END FCT ^M / 10**@M( ^M )
+
+! Round of floating point number with specified # of decimal figures.
+FCT @ROF( NUM ^N, NUM ^F )
+  LCL NUM ^M
+  ^M == 10**^F
+END FCT ROUNDF( ^N * ^M ) / ^M
+
+! Round of signific number with specified # of significant figures.
+FCT @ROE( NUM ^N, NUM ^E )
+  LCL NUM ^M
+  ^M == 10**@M( ^N )
+END FCT @ROF( ^N / ^M, ^E - 1 ) * ^M
+
+
+! Return the middle one of any 3 numbers
+! ^O | ^V | ^I
+FCT @MIX( NUM ^V, NUM ^O, NUM ^I )
+  ^I == ^I - ^V
+  ^O == ^O - ^V
+END FCT ^V + (^O * ^I > 0) * @IE( ^O * ^O < ^I * ^I, ^O, ^I )
+!!!!!!! ^V - @IE( ^O * ^I > 0, @IE( ^O * ^O < ^I * ^I, ^O, ^I ), 0 )  ! Bug of nested FCT
+
+! Return max of N inputs
+FCT @MAX( NUM ^N, NUM ^MAX(0..#2) )
+  IF ^N > #2
+    ^N == #2
+  END IF
+
+  ^MAX(0) == -@INF
+
+  FOR ^N 1 ^N  !!Bug??
+    IF ^MAX(^N) > ^MAX(0)
+      ^MAX(0) == ^MAX(^N)
+    END IF
+  END FOR
+END FCT ^MAX(0)
+
+! Return min of N inputs
+FCT @MIN( NUM ^N, NUM ^MIN(0..#2) )
+  IF ^N > #2
+    ^N == #2
+  END IF
+
+  ^MIN(0) == +@INF
+
+  FOR ^N 1 ^N  !!Bug??
+    IF ^MIN(^N) < ^MIN(0)
+      ^MIN(0) == ^MIN(^N)
+    END IF
+  END FOR
+END FCT ^MIN(0)
+
+
+! Degrees to radians
+FCT @RD( NUM ^D )
+END FCT ^D / 180 * @PI
+
+! Radians to degrees
+FCT @DR( NUM ^R )
+END FCT ^R / @PI * 180
+
+! Wrap of built-in math function  TANF(), with incoming be of degrees
+FCT @TAN( NUM ^D )
+END FCT TANF( @RD( ^D ) )
+
+! Wrap of built-in math function  SINF(), with incoming be of degrees
+FCT @SIN( NUM ^D )
+END FCT SINF( @RD( ^D ) )
+
+! Wrap of built-in math function  COSF(), with incoming be of degrees
+FCT @COS( NUM ^D )
+END FCT COSF( @RD( ^D ) )
+
+! Wrap of built-in math function ATANF(), with outgoing be of degrees
+FCT @ATAN( NUM ^N )
+END FCT @DR( ATANF(     ( ^N         ) ) )
+
+! Wrap of built-in math function ASINF(), with outgoing be of degrees
+FCT @ASIN( NUM ^N )
+END FCT @DR( ASINF( @MIX( ^N, -1, +1 ) ) )
+
+! Wrap of built-in math function ACOSF(), with outgoing be of degrees
+FCT @ACOS( NUM ^N )
+END FCT @DR( ACOSF( @MIX( ^N, -1, +1 ) ) )
+
+! Alias of TAN
+FCT @TG( NUM ^D )
+END FCT TANF( @RD( ^D ) )
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+fct @rxy( num ^x, num ^y )
+end fct sqrtf( ^x**2 + ^y**2 )
+
+fct @txy( num ^x, num ^y )
+end fct @atg( ^y, ^x )
+
+fct @xrt( num ^r, num ^t )
+end fct ^r * @cos( ^t )
+
+fct @yrt( num ^r, num ^t )
+end fct ^r * @sin( ^t )
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Map @ATAN( ^Y / ^X ) to (-180, +180]
+FCT @ATG( NUM ^Y, NUM ^X )
+  LCL NUM ^ATG
+
+  IF ^X
+    ^ATG == @ATAN( ^Y / ^X )
+    IF ^X < 0
+      ^ATG == ^ATG + @LEG( ^Y, -180, +180, +180 )
+    END IF
+  ELS
+    ^ATG == @SGN( ^Y ) * 90
+  END IF
+END FCT ^ATG
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! CV # functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+! Indexing support negative
+FCT @I( NUM ^I, NUM ^N )
+  IF ^I < 0
+    ^I == ^I + ^N + 1
+    IF ^I < 00;^I == 00;END IF
+  ELS
+    IF ^I > ^N;^I == ^N;END IF
+  END IF
+END FCT ^I
+
+! Return lens element # with negative indexing and exception fixed
+FCT @L( NUM ^L )
+  LCL NUM ^Z ^S ^N
+
+  ^Z == 1
+  ^N == 0  ! (NUM ELE) with BUG IN AUT
+  FOR ^S 1 (NUM S)-2
+    IF (IND Z01 S^S) > 1.1
+      ^N == ^N + 1
+    END IF
+  END FOR
+
+  ^L == @I( ROUNDF( ^L ), ^N )
+  IF 0 = ^L;^L == ^N;END IF
+END FCT ^L
+
+! Return 1st surface # of lens element #
+FCT @E( NUM ^L )
+  LCL NUM ^E
+  LCL NUM ^L ^N
+  LCL NUM ^Z ^S
+
+  ^L == @L( ^L )
+  ^N == (NUM S)
+
+  ^Z == 1
+
+  ^E == 0
+  ^S == 1
+  WHI ^S < ^N
+    IF (IND Z^Z S^S) > 1.1
+      ^L == ^L - 1
+      IF 0 = ^L
+        ^E == ^S
+        ^S == ^N
+      END IF
+    END IF
+    ^S == ^S + 1
+  END WHI
+END FCT ^E
+
+! Surface # with negative indexing and exception fixed.
+FCT @S( NUM ^S )
+ !LCL NUM ^N
+ !^N == (NUM S) + 1
+
+ !^S == ROUNDF( ^S )
+ !IF ^S <  0
+ !  ^S == MODF( ^S+1, ^N ) + ^N - 1
+ !ELS IF ^S > ^N
+ !  ^S == MODF( ^S,   ^N )
+ !END IF
+
+  ^S == @I( ROUNDF( ^S ), (NUM S) )
+  IF ^S = 0;^S == (STO Z1);END IF
+END FCT ^S
+
+! Field # with negative indexing and exception fixed.
+FCT @F( NUM ^F )
+ !LCL NUM ^N
+ !^N == (NUM F)
+
+ !^F == ROUNDF( ^F )
+ !IF 0 = ^F
+ !  ^F == 1
+ !ELS IF ^F <  0
+ !  ^F == MODF( ^F+1, ^N ) + ^N
+ !ELS IF ^F > ^N
+ !  ^F == MODF( ^F-1, ^N ) +  1
+ !END IF
+
+  ^F == @I( ROUNDF( ^F ), (NUM F) )
+  IF ^F = 0;^F == 1;END IF
+END FCT ^F
+
+! Wave # with negative indexing and exception fixed.
+FCT @W( NUM ^W )
+ !LCL NUM ^Z
+ !LCL NUM ^N
+ !^N == (NUM W)
+
+ !^Z == 1
+
+ !^W == ROUNDF( ^W )
+ !IF 0 = ^W
+ !  ^W == (REF Z^Z)
+ !ELS IF ^W <  0
+ !  ^W == MODF( ^W+1, ^N ) + ^N
+ !ELS IF ^W > ^N
+ !  ^W == MODF( ^W-1, ^N ) +  1
+ !END IF
+
+  ^W == ROUNDF( ^W )
+
+  IF ^W < 0
+    ^W == ^W + (NUM W) + 1
+  END IF
+
+  IF ^W < 1 OR (NUM W) < ^W
+    ^W == (REF Z1)
+  END IF
+END FCT ^W
+
+! Zoom position with negative indexing and exception fixed.
+FCT @Z( NUM ^Z )
+ !LCL NUM ^N
+ !^N == (NUM Z)
+
+ !^Z == ROUNDF( ^Z )
+ !IF 0 = ^Z
+ !  ^Z == 1
+ !ELS IF ^Z <  0
+ !  ^Z == MODF( ^Z+1, ^N ) + ^N
+ !ELS IF ^Z > ^N
+ !  ^Z == MODF( ^Z-1, ^N ) +  1
+ !END IF
+
+  ^Z == @I( ROUNDF( ^Z ), (NUM Z) )
+  IF ^Z = 0;^Z == 1;END IF
+END FCT ^Z
+
+! Reference ray # with negative indexing and exception fixed.
+! R0: last traced ray
+FCT @R( NUM ^R )
+ !LCL NUM ^N
+ !^N == 9
+
+ !^R == ROUNDF( ^R )
+ !IF 0 = ^R
+ !  ^R == 1
+ !ELS IF ^R <  0
+ !  ^R == MODF( ^R+1, ^N ) + ^N
+ !ELS IF ^R > ^N
+ !  ^R == MODF( ^R-1, ^N ) +  1
+ !END IF
+
+  ^R == ROUNDF( ^R )
+  IF ^R < 1 OR ^R > 5;^R == 1;END IF
+END FCT ^R
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! String functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! 
+! Wrap of built-in string function SUBSTR(), with negative indexing and exception fixed
+FCT @SUBSTR( STR ^S, NUM ^A, NUM ^B )
+  GBL STR ^SUBSTR
+  LCL NUM ^L
+
+  ^L == LENSTR( ^S )
+  ^A == ROUNDF( ^A )
+  ^B == ROUNDF( ^B )
+
+  IF ^A < 0
+    ^A == ^A + ^L + 1
+  END IF
+  IF ^B < 0
+    ^A == ^A + ^B + 1
+    ^B == -^B
+  END IF
+  ^B == ^A + ^B - 1
+
+  IF ^A <  1
+    ^A ==  1
+  END IF
+  IF ^B > ^L
+    ^B == ^L
+  END IF
+  ^B == ^B - ^A + 1
+
+  IF ^B > 0
+    ^SUBSTR == SUBSTR( ^S, ^A, ^B )
+  ELS
+    ^SUBSTR == ''
+  END IF
+END FCT ^B <> LENSTR( ^SUBSTR)
+
+! Wrap of built-in sting function LOCSTR(), with empty string exception fixed
+FCT @LOCSTR( STR ^S, STR ^T )
+END FCT ("" <> ^T) * LOCSTR( ^S, ^T )
+
+! Wrap of built-in string function SPLIT(), with default STR / NUM array inside
+FCT @SPLIT( STR ^STR, STR ^SEP, STR ^SPLIT(01..#2), NUM ^TILPS(00..#2) )
+  GBL STR ^SPLIT(01..#2)
+  GBL NUM ^TILPS(00..#2)
+  LCL NUM ^N
+
+  ^TILPS(0) == SPLIT( ^STR, ^SEP, ^SPLIT )
+  FOR ^N 1 ^TILPS(0)
+    ^TILPS(^N) == STR_TO_NUM( ^SPLIT(^N) )
+  END FOR
+END FCT ^TILPS(0)
+
+
+! Wrap of built-in string function STR_TO_NUM(), to just simplify the function name to NUM
+FCT @NUM( STR ^S )
+END FCT STR_TO_NUM( ^S )
+
+! Wrap of built-in string function NUM_TO_STR(), to just simplify the function name to STR
+FCT @STR( NUM ^N )
+  GBL STR ^STR
+  LCL STR ^SGN
+  LCL NUM ^M
+
+  IF ^N
+    IF ^N < 0
+      ^N == -^N
+      ^SGN == '-.'
+    ELS
+    !!^N == +^N
+      ^SGN == '+.'
+    END IF
+
+    ^M == @M( ^N ) + 1
+    IF ^M
+      IF ^M < 0
+        ^STR == CONCAT( 'E-', ^INT(-^M) )
+      ELS
+        ^STR == CONCAT( 'E+', ^INT(+^M) )
+      END IF
+    ELS
+      ^STR == 'E0000'
+    END IF
+
+    ^N == ROUNDF( ^N * 10**(16 - ^M) )
+    FOR ^I 1 5
+      ^M == MODF( ^N, 1000 )
+      ^N == (^N - ^M) / 1000
+      ^STR == CONCAT( ^INT(^M), ^STR )
+    END FOR
+    ^STR == CONCAT( ^INT(1100 + ^N), ^STR )
+
+    ^STR == CONCAT( ^SGN, ^STR )
+  ELS
+  !!^N ==  ^N
+    ^STR == '0.0000000000000000E0000'
+  END IF
+END FCT STR_TO_NUM( ^STR )
+
+! Push string into string
+FCT @PUT( STR ^STR, STR ^SEP )
+  GBL STR ^PUT
+
+  IF '9527' = ^STR
+    ^OK  == CVPUTREC( ^PUT )
+    ^PUT == ''
+  ELS
+    ^PUT == CONCAT( ^PUT, ^SEP )
+    ^PUT == CONCAT( ^PUT, ^STR )
+  END IF
+END FCT LENSTR( ^PUT )
+
+! Parse command ?CLS text into array ^CLS string
+FCT @CLS( NUM ^LEN, STR ^TXT )
+  GBL STR ^CLS(00..#2)
+  LCL NUM ^N
+
+  ^LEN == ABSF( ^LEN )
+
+  ^PUT == ''
+  FOR ^N 1 ^LEN
+    ^RTN == @PUT( ^CLS(^N), ' ' )
+  END FOR
+
+  ^TXT == TRUNC( ^TXT )
+  ^N == LOCSTR( ^TXT, ' ' )
+  WHI ^N
+    ^TXT == SUBSTR( ^TXT, ^N + 1, LENSTR( ^TXT ) )
+    ^N == LOCSTR( ^TXT, ' ' )
+  END WHI
+
+  FOR ^N 1 LENSTR( ^TXT ) 4
+    ^LEN == ^LEN + 1
+    ^CLS(^LEN) == SUBSTR( ^TXT, ^N, 3 )
+    ^RTN == @PUT( ^CLS(^LEN), ' ' )
+  END FOR
+  ^CLS(0) == ^PUT
+END FCT ^LEN
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! System data functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+! Get database item by function call to bypass format restriction when inconvenient
+FCT @GET( STR ^TEG, NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R, NUM ^G )
+  GBL NUM ^GET
+  GBL STR ^TEG
+
+  ^TEG == UPCASE( ^TEG )
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+  ^S == @S( ^S )
+  ^R == @R( ^R )
+
+  IF 0 > ^G OR ^G > (NUM S)
+    ^G == ^S
+  END IF
+
+  IF 0
+  ELS IF 'RDY' = ^TEG; ^GET == (RDY Z^Z         S^S        )
+  ELS IF 'CUY' = ^TEG; ^GET == (CUY Z^Z         S^S        )
+  ELS IF 'THI' = ^TEG; ^GET == (THI Z^Z         S^S        )
+  ELS IF 'IND' = ^TEG; ^GET == (IND Z^Z W^W     S^S        )
+  ELS IF 'ABV' = ^TEG; ^GET == (ABV Z^Z         S^S        )
+
+  ELS IF 'EPD' = ^TEG; ^GET == (EPD Z^Z                    )
+  ELS IF 'FNO' = ^TEG; ^GET == (FNO Z^Z                    )
+  ELS IF 'NA ' = ^TEG; ^GET == (NA  Z^Z                    )
+  ELS IF 'NAO' = ^TEG; ^GET == (NAO Z^Z                    )
+
+  ELS IF 'WL'  = ^TEG; ^GET == (WL      W^W                )
+  ELS IF 'REF' = ^TEG; ^GET == (REF Z^Z                    )
+  ELS IF 'WTW' = ^TEG; ^GET == (WTW Z^Z W^W                )
+
+  ELS IF 'YAN' = ^TEG; ^GET == (YAN Z^Z     F^F            )
+  ELS IF 'YOB' = ^TEG; ^GET == (YOB Z^Z     F^F            )
+  ELS IF 'YIM' = ^TEG; ^GET == (YIM Z^Z     F^F            )
+  ELS IF 'YRI' = ^TEG; ^GET == (YRI Z^Z     F^F            )
+
+  ELS IF 'VUY' = ^TEG; ^GET == (VUY Z^Z     F^F            )
+  ELS IF 'VLY' = ^TEG; ^GET == (VLY Z^Z     F^F            )
+  ELS IF 'VUX' = ^TEG; ^GET == (VUX Z^Z     F^F            )
+  ELS IF 'VLX' = ^TEG; ^GET == (VLX Z^Z     F^F            )
+
+  ELS IF 'EFL' = ^TEG; ^GET == (EFL Z^Z                    )
+  ELS IF 'RED' = ^TEG; ^GET == (RED Z^Z W^W                )
+  ELS IF 'EXD' = ^TEG; ^GET == (EXD Z^Z                    )
+  ELS IF 'ENP' = ^TEG; ^GET == (ENP Z^Z     F^F            )
+  ELS IF 'EXP' = ^TEG; ^GET == (EXP Z^Z     F^F            )
+  ELS IF 'DIX' = ^TEG; ^GET == (DIX Z^Z     F^F            )
+  ELS IF 'DIY' = ^TEG; ^GET == (DIY Z^Z     F^F            )
+  ELS IF 'XFO' = ^TEG; ^GET == (XFO Z^Z     F^F            )
+  ELS IF 'YFO' = ^TEG; ^GET == (YFO Z^Z     F^F            )
+
+  ELS IF 'X'   = ^TEG; ^GET == (X   Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'Y'   = ^TEG; ^GET == (Y   Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'Z'   = ^TEG; ^GET == (Z   Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'L'   = ^TEG; ^GET == (L   Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'M'   = ^TEG; ^GET == (M   Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'N'   = ^TEG; ^GET == (N   Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'AOI' = ^TEG; ^GET == (AOI Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'AOR' = ^TEG; ^GET == (AOR Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'SRL' = ^TEG; ^GET == (SRL Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'SRM' = ^TEG; ^GET == (SRM Z^Z W^W F^F S^S R^R G^G)
+  ELS IF 'SRN' = ^TEG; ^GET == (SRN Z^Z W^W F^F S^S R^R G^G)
+
+  ELS IF 'ASC' = ^TEG; ^GET == (ASC Z^Z         S^S     G^G)
+  ELS IF 'BSC' = ^TEG; ^GET == (BSC Z^Z         S^S     G^G)
+  ELS IF 'CSC' = ^TEG; ^GET == (CSC Z^Z         S^S     G^G)
+  ELS IF 'XSC' = ^TEG; ^GET == (XSC Z^Z         S^S     G^G)
+  ELS IF 'YSC' = ^TEG; ^GET == (YSC Z^Z         S^S     G^G)
+  ELS IF 'ZSC' = ^TEG; ^GET == (ZSC Z^Z         S^S     G^G)
+  ELS IF 'LSC' = ^TEG; ^GET == (LSC Z^Z         S^S     G^G)
+  ELS IF 'MSC' = ^TEG; ^GET == (MSC Z^Z         S^S     G^G)
+  ELS IF 'NSC' = ^TEG; ^GET == (NSC Z^Z         S^S     G^G)
+
+  ELS IF 'GLA' = ^TEG; ^TEG == (GLA Z^Z         S^S        )
+  ELS IF 'GDP' = ^TEG; ^TEG == (GDP Z^Z         S^S        )
+  ELS IF 'CAT' = ^TEG; ^TEG == (GLA Z^Z         S^S     CAT)
+  END IF
+END FCT ^GET
+
+! Reference wavelength
+FCT @REF( NUM ^Z )
+  LCL NUM ^REF
+  ^Z == @Z( ^Z )
+  ^REF == (REF Z^Z)
+END FCT (WL W^REF)
+
+! Return wavelength value of optical spectral line
+FCT @WAV( STR ^S )
+  LCL NUM ^WAV
+
+  IF "" = ^S
+    ^WAV == 0
+  ELS IF "i"  = ^S
+    ^WAV ==  365.0146
+  ELS IF "h"  = ^S
+    ^WAV ==  404.6561
+  ELS IF "g"  = ^S
+    ^WAV ==  435.8343
+  ELS IF "F'" = ^S
+    ^WAV ==  479.9914
+  ELS IF "F"  = ^S
+    ^WAV ==  486.1327
+  ELS IF "e"  = ^S
+    ^WAV ==  546.0740
+  ELS IF "d"  = ^S
+    ^WAV ==  587.5618
+  ELS IF "D"  = ^S
+    ^WAV ==  589.2938
+  ELS IF "C'" = ^S
+    ^WAV ==  643.8469
+  ELS IF "C"  = ^S
+    ^WAV ==  656.2725
+  ELS IF "r"  = ^S
+    ^WAV ==  706.5188
+  ELS IF "s"  = ^S
+    ^WAV ==  852.1100
+  ELS IF "t"  = ^S
+    ^WAV == 1013.9800
+  ELS
+    ^WAV == @NUM( ^S )
+  END IF
+
+  IF (^WAV < 248.3000) OR (^WAV > 2325.4200)
+    ^WAV ==  587.5618
+  END IF
+END FCT ^WAV
+
+! Get field fraction of equal area between adjacent
+FCT @FF( NUM ^N )
+  GBL NUM ^FF(0..25)
+
+  ^N == @MIX( @AI( ^N ), 1, 25 )
+
+  ^FF(1) ==  0
+  FOR ^F 2 ^N
+    ^FF( ^F ) == SQRTF( (^F - 1) / (^N - 1) )
+  END FOR
+  ^FF(0) == ^N
+END FCT ^FF(0)
+
+!APE == LOCSTR( '  EPDFNONA NAO', (TYP APE) ) / 3
+!FLD == LOCSTR( '  ANGOBJIMGRIH', (TYP FLD) ) / 3
+
+!! Retrieve field values and MIN / MAX
+!FCT @FLD( NUM ^Z, NUM ^F )
+!  GBL NUM ^FLD(00..27)
+!  LCL NUM ^MIN ^MAX
+!  LCL NUM ^N ^K
+!  LCL STR ^TYP
+!
+!  ^Z == @Z( ^Z )
+!
+!  ^N == (NUM F)
+!  ^F == ROUNDF( ^F )
+!  IF ^F < 0
+!    ^F == ^F + ^N + 1
+!  END IF
+!  ^K == ^F
+!
+!  ^TYP == (TYP FLD)
+!  IF 01 <= ^F AND ^F <= ^N
+!    IF     'ANG' = ^TYP;             ^FLD(^F) == (YAN Z^Z F^F)
+!    ELS IF 'OBJ' = ^TYP;             ^FLD(^F) == (YOB Z^Z F^F)
+!    ELS IF 'IMG' = ^TYP;             ^FLD(^F) == (YIM Z^Z F^F)
+!    ELS                ;             ^FLD(^F) == (YRI Z^Z F^F)
+!    END IF
+!  ELS
+!    IF ^F < 26 OR 27 < ^F
+!      ^K == 0
+!    END IF
+!
+!    IF     'ANG' = ^TYP;FOR ^F 01 ^N;^FLD(^F) == (YAN Z^Z F^F);END FOR
+!    ELS IF 'OBJ' = ^TYP;FOR ^F 01 ^N;^FLD(^F) == (YOB Z^Z F^F);END FOR
+!    ELS IF 'IMG' = ^TYP;FOR ^F 01 ^N;^FLD(^F) == (YIM Z^Z F^F);END FOR
+!    ELS                ;FOR ^F 01 ^N;^FLD(^F) == (YRI Z^Z F^F);END FOR
+!    END IF
+!
+!    ^MIN == ^FLD(01);^MAX == ^FLD(01)
+!    FOR ^F 2 ^N
+!      IF ^FLD(^F) < ^MIN;^MIN == ^FLD(^F);ELS IF ^FLD(^F) > ^MAX;^MAX == ^FLD(^F);END IF
+!    END FOR
+!    ^FLD(26) == ^MIN;^FLD(27) == ^MAX
+!
+!    ^FLD(00) == @IE( -^FLD(26) > +^FLD(27), ^FLD(26), ^FLD(27) )
+!  END IF
+!END FCT ^FLD(^K)
+!
+!! Max magnitude of y field
+!FCT @MFY( NUM ^Z )
+!END FCT @FLD( ^Z,     00   )
+!
+!! Min value of y field
+!FCT @MNY( NUM ^Z )
+!END FCT @FLD( ^Z,     26   )
+!
+!! Max value of y field
+!FCT @MXY( NUM ^Z )
+!END FCT @FLD( ^Z,     27   )
+
+! Max magnitude of y field
+FCT @MFY( NUM ^Z )
+  LCL NUM ^MFY
+  LCL NUM ^MAX
+  LCL NUM ^MIN
+
+  ^Z == @Z( ^Z )
+
+  ^MFY == @FLD( ^Z, 01 )
+  ^MAX == ^MFY
+  ^MIN == ^MFY
+
+  FOR ^F 2 (NUM F)
+    ^MFY == @FLD( ^Z, ^F )
+    IF ^MFY > ^MAX;^MAX == ^MFY;ELS IF ^MFY < ^MIN;^MIN == ^MFY;END IF
+  END FOR
+
+  IF ^MAX + ^MIN < 0
+    ^MFY == ^MIN
+  ELS
+    ^MFY == ^MAX
+  END IF
+END FCT ^MFY
+
+! Max value of y field
+FCT @MXY( NUM ^Z )
+  LCL NUM ^MXY
+  ^Z == @Z( ^Z )
+  ^MXY == @FLD( ^Z, 01 )
+  FOR ^F 2 (NUM F)
+    ^MXY == MAXF( ^MXY, @FLD( ^Z, ^F ) )
+  END FOR
+END FCT ^MXY
+
+! Min value of y field
+FCT @MNY( NUM ^Z )
+  LCL NUM ^MNY
+  ^Z == @Z( ^Z )
+  ^MNY == @FLD( ^Z, 01 )
+  FOR ^F 2 (NUM F)
+    ^MNY == MINF( ^MNY, @FLD( ^Z, ^F ) )
+  END FOR
+END FCT ^MNY
+
+! Relative y field fraction of input absolute y field value
+! N -> 1
+FCT @RFY( NUM ^Z, NUM ^AFY )
+  LCL NUM ^RFY
+  ^RFY == @MFY( ^Z )
+  IF ^RFY
+    IF 'ANG' = (TYP FLD) AND ABSF( ^RFY ) < 90
+      ^AFY == @TAN( ^AFY )
+      ^RFY == @TAN( ^RFY )
+    END IF
+    ^RFY == ^AFY / ^RFY
+  END IF
+END FCT ^RFY
+
+! Absolute y field value of input relative y field fraction
+! 1 -> N
+FCT @AFY( NUM ^Z, NUM ^RFY )
+  LCL NUM ^AFY
+  ^AFY == @MFY( ^Z )
+  IF ^AFY
+    IF 'ANG' = (TYP FLD) AND ABSF( ^AFY ) < 90
+      ^AFY == @ATAN( @TAN( ^AFY ) * ^RFY )
+    ELSE
+      ^AFY == ^AFY * ^RFY
+    END IF
+  END IF
+END FCT ^AFY
+
+! Y value of field F#
+! # -> N
+FCT @FY( NUM ^Z, NUM ^F )
+END FCT @FLD( ^Z, @F( ^F ) )
+
+! # -> 1
+FCT @F_( NUM ^Z, NUM ^F )
+END FCT @RFY( ^Z, @FY( ^Z, ^F ) )
+
+! 1 -> #
+FCT @_F( NUM ^Z, NUM ^F )
+END FCT @F( ABSF( ^F ) * ((NUM F) - 1) + 1 )
+
+! VIG
+!!! @VIG( NUM ^Z, NUM ^F, NUM ^R )
+! GBL NUM ^VIG(00..25,05)
+! LCL NUM ^N
+
+! ^Z == @Z( ^Z )
+
+! ^N == (NUM F)
+! ^F == ROUNDF( ^F )
+! IF ^F < 0
+!   ^F == ^F + ^N + 1
+! END IF
+
+! ^R == ROUNDF( ^R )
+! IF ^R < 2 OR 5 < ^R
+!   ^R == 1
+! END IF
+
+! IF 01 <= ^F AND ^F <= ^N
+!   ^VIG(^F,2) == 1 - (VUY Z^Z F^F)
+!   ^VIG(^F,3) == 1 - (VLY Z^Z F^F)
+!   ^VIG(^F,4) == 1 - (VUX Z^Z F^F)
+!   ^VIG(^F,5) == 1 - (VLX Z^Z F^F)
+! ELS
+!   FOR ^F 1 ^N
+!   ^VIG(^F,2) == 1 - (VUY Z^Z F^F)
+!   ^VIG(^F,3) == 1 - (VLY Z^Z F^F)
+!   ^VIG(^F,4) == 1 - (VUX Z^Z F^F)
+!   ^VIG(^F,5) == 1 - (VLX Z^Z F^F)
+!   END FOR
+! END IF
+!!! FCT ^VIG(^F,^R)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Optical functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+
+! Paraxial ray based functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Focal length / Back focal length / Principle plane position of S^S0..^S1
+FCT @FBP( NUM ^Z, NUM ^W, NUM ^S0, NUM ^S1 )
+  GBL NUM ^FBP(0..2,0..1)
+
+  LCL NUM ^DENOM ^NUMER
+
+  LCL NUM ^HM0 ^HC0 ^UM0 ^UC0
+  LCL NUM ^HM1 ^HC1 ^UM1 ^UC1
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  ^S0 == @S( ^S0 )
+  ^S1 == @S( ^S1 )
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^S == ^S0
+
+  ^HM0 == (HMY Z^Z W^W S^S); ^HC0 == (HCY Z^Z W^W S^S)
+  IF 0 < ^S0 AND ^S0 <= ^S1; ^S == ^S - 1; END IF
+  ^UM0 == (UMY Z^Z W^W S^S); ^UC0 == (UCY Z^Z W^W S^S)
+
+  IF 0 = ^S
+    ^HM0 == (HMY Z^Z W^W S1) - (THI Z^Z S0) * ^UM0  ! Fix bug of 0 = (HMY S0) @ infinite conjugate
+  END IF
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^S == ^S1
+
+  ^HM1 == (HMY Z^Z W^W S^S); ^HC1 == (HCY Z^Z W^W S^S)
+  IF 0 < ^S1 AND ^S1 <  ^S0; ^S == ^S - 1; END IF
+  ^UM1 == (UMY Z^Z W^W S^S); ^UC1 == (UCY Z^Z W^W S^S)
+
+  IF 0 = ^S
+    ^HM1 == (HMY Z^Z W^W S1) - (THI Z^Z S0) * ^UM1  ! Fix bug of 0 = (HMY S0) @ infinite conjugate
+  END IF
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^DENOM == ^UM0 * ^UC1 - ^UM1 * ^UC0
+
+  ^NUMER == ^HM0 * ^UC0 - ^UM0 * ^HC0
+  ^FBP(0,0) == ^NUMER / ^DENOM
+
+  ^NUMER == ^HM1 * ^UC0 - ^UM0 * ^HC1
+  ^FBP(1,0) == ^NUMER / ^DENOM
+
+  ^FBP(2,0) == ^FBP(1,0) - ^FBP(0,0)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^DENOM == ^UM1 * ^UC0 - ^UM0 * ^UC1
+
+  ^NUMER == ^HM1 * ^UC1 - ^UM1 * ^HC1
+  ^FBP(0,1) == ^NUMER / ^DENOM
+
+  ^NUMER == ^HM0 * ^UC1 - ^UM1 * ^HC0
+  ^FBP(1,1) == ^NUMER / ^DENOM
+
+  ^FBP(2,1) == ^FBP(1,1) - ^FBP(0,1)
+END FCT ^FBP(1,0)
+
+! Magnification of image within surfcae range S^S0..^S1!!!!!!!!!!!!!!!!!!!!
+FCT @MMY( NUM ^Z, NUM ^W, NUM ^S0, NUM ^S1 )
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  ^S0 == @S( ^S0 )
+  ^S1 == @S( ^S1 )
+
+  IF 0 < ^S0 AND ^S0 <= ^S1; ^S0 == ^S0 - 1; END IF
+  IF 0 < ^S1 AND ^S1 <  ^S0; ^S1 == ^S1 - 1; END IF
+END FCT @DO( (UMY Z^Z W^W S^S0), (UMY Z^Z W^W S^S1), 1E100 )
+
+! Magnification of pupil within surfcae range S^S0..^S1!!!!!!!!!!!!!!!!!!!!
+FCT @MCY( NUM ^Z, NUM ^W, NUM ^S0, NUM ^S1 )
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  ^S0 == @S( ^S0 )
+  ^S1 == @S( ^S1 )
+
+  IF 0 < ^S0 AND ^S0 <= ^S1; ^S0 == ^S0 - 1; END IF
+  IF 0 < ^S1 AND ^S1 <  ^S0; ^S1 == ^S1 - 1; END IF
+END FCT @DO( (UCY Z^Z W^W S^S0), (UCY Z^Z W^W S^S1), 1E100 )
+
+! Paraxial image focus shift relative to s^s at w^w and z^z
+FCT @PIM( NUM ^Z, NUM ^W, NUM ^S )
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^S == @S( ^S )
+END FCT -@DO( (HMY Z^Z W^W S^S), (UMY Z^Z W^W S^S), 1E100 )
+
+! Real ray based functions  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Wrap of built-in function rayrsi, return (Y)
+^RTN == @FCT( '@RSI( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^FX, NUM ^FY, NUM ^RX, NUM ^RY )' )
+FCT @RSI( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^FX, NUM ^FY, NUM ^RX, NUM ^RY )
+  LCL NUM ^RAY(4)
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  IF ^F;^F == @F( ^F );END IF
+  IF ^S;^S == @S( ^S );END IF
+
+  ^RAY(1) == ^RX
+  ^RAY(2) == ^RY
+  ^RAY(3) == ^FX
+  ^RAY(4) == ^FY
+END FCT (NOT RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )) * (Y)
+
+FCT @RAY( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^RAY(4)
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+  ^RAY(4) == ^R!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^RAY(2) == ^F!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^RAY(2) == ^R!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ^RAY(4) == ^F!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  IF ^F < 2
+    ^F == 0
+  ELS
+    ^F == @F( ^F )
+  END IF
+END FCT (NOT RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )) * (Y)
+
+! Average Y of paired rays
+FCT @YY( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^YY
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+
+  IF ^F < 2
+    ^YY == (@RSI( ^Z, ^W, 00, ^S, 0, ^F, 0, +^R ) + @RSI( ^Z, ^W, 00, ^S, 0, ^F, 0, -^R )) / 2
+  ELS
+    ^F == @F( ^F )
+    ^YY == (@RSI( ^Z, ^W, ^F, ^S, 0, 00, 0, +^R ) + @RSI( ^Z, ^W, ^F, ^S, 0, 00, 0, -^R )) / 2
+  END IF
+END FCT ^YY
+
+! Average Y of paired rays diff to reference ray
+FCT @YY_Y( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^YY_Y
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+
+  IF ^F < 2
+    ^YY_Y == (@RSI( ^Z, ^W, 00, ^S, 0, ^F, 0, +^R ) + @RSI( ^Z, ^W, 00, ^S, 0, ^F, 0, -^R )) / 2 - @RSI( ^Z, 00, 00, ^S, 0, ^F, 0, 0 )
+  ELS
+    ^F == @F( ^F )
+    ^YY_Y == (@RSI( ^Z, ^W, ^F, ^S, 0, 00, 0, +^R ) + @RSI( ^Z, ^W, ^F, ^S, 0, 00, 0, -^R )) / 2 - @RSI( ^Z, 00, ^F, ^S, 0, 00, 0, 0 )
+  END IF
+END FCT ^YY_Y
+
+! Average Y of paired rays diff to reference paired rays
+FCT @YY_YY( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^YY_YY
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+
+  IF ^F < 2
+    ^YY_YY == ((@RSI( ^Z, ^W, 00, ^S, 0, ^F, 0, +^R ) + @RSI( ^Z, ^W, 00, ^S, 0, ^F, 0, -^R )) - (@RSI( ^Z, 00, 00, ^S, 0, ^F, 0, +^R ) + @RSI( ^Z, 00, 00, ^S, 0, ^F, 0, -^R ))) / 2
+  ELS
+    ^F == @F( ^F )
+    ^YY_YY == ((@RSI( ^Z, ^W, ^F, ^S, 0, 00, 0, +^R ) + @RSI( ^Z, ^W, ^F, ^S, 0, 00, 0, -^R )) - (@RSI( ^Z, 00, ^F, ^S, 0, 00, 0, +^R ) + @RSI( ^Z, 00, ^F, ^S, 0, 00, 0, -^R ))) / 2
+  END IF
+END FCT ^YY_YY
+
+! Spherical aberration Y
+FCT @SY( NUM ^Z, NUM ^W, NUM ^F, NUM ^R )
+  LCL NUM ^RAY(4)
+  LCL NUM ^SY
+  LCL NUM ^S
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  ^S == 0
+  IF ^R < 0
+    ^S == (STO Z^Z)
+    ^R == -^R * (SD Z^Z S^S)
+  END IF
+
+  ^RAY(2) ==+^R
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^SY == (Y)
+
+  ^RAY(2) ==-^R
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^SY == ( ^SY - (Y)) / 2
+END FCT ^SY
+
+! Spherical aberration X
+FCT @SX( NUM ^Z, NUM ^W, NUM ^F, NUM ^R )
+  LCL NUM ^RAY(4)
+  LCL NUM ^SX
+  LCL NUM ^S
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  ^S == 0
+  IF ^R < 0
+    ^S == (STO Z^Z)
+    ^R == -^R * (SD Z^Z S^S)
+  END IF
+
+  ^RAY(1) ==+^R
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^SX == (X)
+
+  ^RAY(1) ==-^R
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^SX == (^SX - (X)) / 2
+END FCT ^SX
+
+! Coma aberration Y
+FCT @CO( NUM ^Z, NUM ^W, NUM ^F, NUM ^R )
+  LCL NUM ^RAY(4)
+  LCL NUM ^CO
+  LCL NUM ^S
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  ^S == 0
+  IF ^R < 0
+    ^S == (STO Z^Z)
+    ^R == -^R * (SD Z^Z S^S)
+  END IF
+
+  ^RAY(2) ==+^R
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^CO == (Y)
+
+  ^RAY(2) ==-^R
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^CO == (Y) + ^CO
+END FCT ^CO / 2 - (Y Z^Z W^W F^F R01)
+! Element related functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Get optical power of single lens in air
+FCT @PW( NUM ^C1, NUM ^C2, NUM ^T, NUM ^N )
+  IF ^N
+    ^T == ^T / ^N
+    ^N == ^N -  1
+  END IF
+END FCT ^N * (^C1 - ^C2 + ^C1 * ^C2 * ^T * ^N)
+
+! Get focal length of single lens in air
+FCT @FL( NUM ^Z, NUM ^W, NUM ^S )
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^S == @S( ^S )
+END FCT @DO( 1.0, @PW( (CUY S^S+0 Z^Z), (CUY S^S+1 Z^Z), (THI S^S Z^Z), (IND S^S W^W Z^Z) ), 0.0 )
+
+! Wrap of built in function SAGF() with linear extended aperture defined in YZ plane
+FCT @SAG( NUM ^Z, NUM ^S, NUM ^M, NUM ^N )
+  ^Z == @Z( ^Z )
+  ^S == @S( ^S )
+END FCT SAGF( ^S, ^Z, 0, (MAV Z^Z S^S) * ^M + ^N )
+
+! Redefine (BLO) to function with signed return value and linear extended aperture
+FCT @BLO( NUM ^Z, NUM ^S, NUM ^M, NUM ^N )
+  ^Z == @Z( ^Z )
+  ^S == @S( ^S )
+END FCT (CUY Z^Z S^S) * ((SD Z^Z S^S) * ^M + ^N)
+
+! Get Z number of S^S1..^S2 at Z^Z with linear extended aperture (SD S^S1)*^M1+^N1 & (SD S^S2)*^M2+^N2
+FCT @ZNO( NUM ^Z, NUM ^S1, NUM ^M1, NUM ^N1, NUM ^S2, NUM ^M2, NUM ^N2, NUM ^O )
+	LCL NUM ^ZNO
+
+  ^Z  == @Z( ^Z  )
+
+  ^S1 == @S( ^S1 )
+  ^S2 == @S( ^S2 )
+
+!!IF   0 = ^S1;^S1 == @S( ^S2 - 1 );END IF
+  IF   0 = ^S2;^S2 == @S( ^S1 + 1 );END IF
+
+  IF ^S1 = ^S2;^S2 == @S( ^S1 + 1 );END IF
+
+  ^ZNO == EXPF( -@POW( (@BLO( ^Z, ^S1, ^M1, ^N1 ) - @BLO( ^Z, ^S2, ^M2, ^N2 )) / 2, 2 ) )
+
+  IF ^O
+    ^ZNO == EXPF( -@POW( ^O, 2 ) ) - ^ZNO
+  ELS
+    ^ZNO == SQRTF( -LOGF( ^ZNO ) )
+  END IF
+END FCT ^ZNO
+
+!!fct @vno( num ^z, num ^s, num ^o )
+!!  lcl num ^vno
+!!
+!!  ^vno == (et z^z s^s) / (ct z^z s^s)
+!!
+!!  if ^o
+!!    ^vno == (^o**+2 + ^o**-2) - (^vno**+2 + ^vno**-2)
+!!  els
+!!    if ^vno < 1
+!!      ^vno == 1 / ^vno
+!!    end if
+!!  end if
+!!end fct ^vno
+
+! Return how simple as a catalog lens
+FCT @CAT( NUM ^Z, NUM ^S1, NUM ^S2 )
+  LCL NUM ^C1
+  LCL NUM ^C2
+
+  ^Z  == @Z( ^Z  )
+
+  ^S1 == @S( ^S1 )
+  ^S2 == @S( ^S2 )
+
+!!IF   0 = ^S1;^S1 == @S( ^S2 - 1 );END IF
+  IF   0 = ^S2;^S2 == @S( ^S1 + 1 );END IF
+
+  IF ^S1 = ^S2;^S2 == @S( ^S1 + 1 );END IF
+
+  ^C1 == (CUY Z^Z S^S1)
+  ^C2 == (CUY Z^Z S^S2)
+END FCT ^C1 * ^C2 * (^C1 + ^C2) * 1000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Need checking
+! SMIA-TV Distortion
+FCT @TVD( NUM ^Z, NUM ^W, NUM ^F, NUM ^TVD )
+  ^F == @F( ^F )
+  ^TVD == SQRTF( 1 + ^TVD**2 )
+END FCT (((Y Z^Z W^W F^F R1) / ^TVD / @RSI( ^Z, ^W, 0, 0, 0, @RFY( ^Z, @FY( ^Z, ^F ) ) / ^TVD, 0, 0 ) - 1) * 100)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ^F = ^N > 0 ? # of field : relative field
+^RTN == @FCT( '@PSA( NUM ^Z, NUM ^W, NUM ^F, NUM ^N )' )
+FCT @PSA( NUM ^Z, NUM ^W, NUM ^F, NUM ^N )
+  LCL NUM ^PSA
+  LCL NUM ^RAY(4)
+  LCL NUM ^S ^K
+  LCL NUM ^U ^V ^W
+  LCL NUM ^I ^L ^M
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  ^N == ROUNDF( ^N );IF ^N = 0;^N == 3;END IF
+  IF ^N > 0
+    ^RAY(4) == 0
+    ^F == @F( ^F )
+    ^S == 0
+    ^U == 1 - (VUY Z^Z F^F)
+    ^V == 1 - (VLY Z^Z F^F)
+    ^W == 1 - (VUX Z^Z F^F)
+  ELS
+    ^N == -^N
+    ^RAY(4) == ^F
+    ^F == 0
+    ^S == (STO Z^Z)
+    ^U == (Y Z^Z W^W F01 R02 S^S)
+    ^V == (Y Z^Z W^W F01 R02 S^S)
+    ^W == (Y Z^Z W^W F01 R02 S^S)
+  END IF
+  ^K == @PI / ^N / 2
+
+  ^RAY(1) == 00
+  ^RAY(2) == ^U
+  ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+  ^PSA == 0
+  ^L == (L)
+  ^M == (M)
+  FOR ^I 01 ^N
+    ^RAY(1) == ^W * SINF( ^I * ^K )
+    ^RAY(2) == ^U * COSF( ^I * ^K )
+    ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+    ^PSA == ^PSA + ((M) - ^M) * ((L) + ^L)
+    ^L == (L)
+    ^M == (M)
+  END FOR
+  FOR ^I ^N+1 2*^N
+    ^RAY(1) == ^W * SINF( ^I * ^K )
+    ^RAY(2) == ^V * COSF( ^I * ^K )
+    ^BAD == RAYRSI( ^Z, ^W, ^F, ^S, ^RAY )
+    ^PSA == ^PSA + ((M) - ^M) * ((L) + ^L)
+    ^L == (L)
+    ^M == (M)
+  END FOR
+END FCT ABSF( ^PSA ) * ^K / SINF( ^K )
+
+! Transmission by TRA_1FLD
+^RTN == @FCT( '@TRA( NUM ^Z, NUM ^W, NUM ^F, NUM ^N, NUM ^M )' )
+FCT @TRA( NUM ^Z, NUM ^W, NUM ^F, NUM ^N, NUM ^M )
+  LCL NUM ^RAY(05)
+  GBL NUM ^TRA(10, 22)
+
+  ^Z == @Z( ^Z )
+
+  ^W == ROUNDF( ^W )
+  IF ^W < 0
+    ^W == ^W + (NUM W) + 1
+  END IF
+  IF ^W > (NUM W) + 1
+    ^W == (NUM W) + 1
+  ELS IF ^W < 1
+    ^W == (REF Z^Z)
+  END IF
+
+  ^N == ROUNDF( ^N );IF ^N = 0;^N == 3;END IF
+  IF ^N > 0
+    ^F == @RFY( ^Z, @FY( ^Z, ^F ) )
+  ELS
+    ^N == -^N
+  END IF
+  ^F == @AFY( ^Z, ^F )
+
+  ^M == ABSF( ^M );IF ^M < 1;^M == 1;END IF
+
+  ^BAD == TRA_1FLD( ^Z, 00, ^F, ^N, 0, ^M, ^RAY, ^TRA )
+END FCT (NOT ^BAD) * ^TRA( 3, ^W )
+
+! RIL by PSA ratios with calibration
+^RTN == @FCT( '@RIL( NUM ^Z, NUM ^W, NUM ^F, NUM ^N, NUM ^T )' )
+FCT @RIL( NUM ^Z, NUM ^W, NUM ^F, NUM ^N, NUM ^T )
+END FCT ^T * @PSA( ^Z, ^W, ^F, ^N ) / (M Z^Z F01 R02)**2 / @PI
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Effective F/#
+FCT @EFN( NUM ^Z, NUM ^W, NUM ^F, NUM ^N )
+END FCT SQRTF( .78539816339745 / @PSA( ^Z, ^W, ^F, ^N ) )
+
+! Y field F/#
+FCT @YFN( NUM ^Z, NUM ^W, NUM ^F )
+  LCL NUM ^YFN
+  LCL NUM ^RAY(4)
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  IF ^F > 0
+    ^F == @F( ^F )
+    ^YFN == (M Z^Z W^W F^F R3) - (M Z^Z W^W F^F R2)
+  ELS
+    ^RAY(4) == -^F
+
+    ^RAY(2) == +1
+    ^RTN == RAYRSI( ^Z, ^W, 0, 0, ^RAY )
+    ^YFN == (M)
+
+    ^RAY(2) == -1
+    ^RTN == RAYRSI( ^Z, ^W, 0, 0, ^RAY )
+    ^YFN == (M) - ^YFN
+  END IF
+END FCT 1 / ^YFN
+
+! X field F/#
+FCT @XFN( NUM ^Z, NUM ^W, NUM ^F )
+  LCL NUM ^XFN
+  LCL NUM ^RAY(4)
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+
+  IF ^F > 0
+    ^F == @F( ^F )
+    ^XFN == (L Z^Z W^W F^F R5) - (L Z^Z W^W F^F R4)
+  ELS
+    ^RAY(4) == -^F
+
+    ^RAY(1) == +1
+    ^RTN == RAYRSI( ^Z, ^W, 0, 0, ^RAY )
+    ^XFN == (L)
+
+    ^RAY(1) == -1
+    ^RTN == RAYRSI( ^Z, ^W, 0, 0, ^RAY )
+    ^XFN == (L) - ^XFN
+  END IF
+END FCT 1 / ^XFN
+
+! Average F/#
+FCT @AFN( NUM ^Z, NUM ^W, NUM ^F )
+END FCT 1 / SQRTF( @YFN( ^Z, ^W, ^F ) * @XFN( ^Z, ^W, ^F ) )
+
+! F/# to NA
+FCT @FNA( NUM ^FN )
+END FCT .5 / ^FN
+
+! Airy disc radius y
+FCT @AIRY( NUM ^Z, NUM ^W, NUM ^F )
+  ^W == @W( ^W )
+END FCT 1.22E-6 * (WL W^W) * @YFN( ^Z, ^W, ^F )
+!!! FCT 1.22E-6 * (WL W^W) * @EFN( ^Z, ^W, ^F, ^N )
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Utility functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+FCT @DBG( NUM ^NUM )
+END FCT CVPUTREC( NUM_TO_STR( ^NUM ) )
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Auto clear temp files
+! 
+! LIB
+!  DEL *.REC
+!  DEL *.-.REC
+!
+!  DEL *.TMP
+!  DEL *.*.TMP
+! CAN
+SYS HID "DEL CODEV*.REC"
+SYS HID "DEL *.TMP"
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! Fit through focus MTF curve to quadratic form MTF = ABC(2) * (FOC - ABC(1))^2 + ABC(0)
+FCT @MTF( NUM ^Z, NUM ^F, NUM ^Q, NUM ^A, NUM ^N, NUM ^MTF(6,18), NUM ^ABC(0..2), NUM ^M )
+  GBL NUM ^MTF(6,18)
+  GBL NUM ^ABC(0..2)
+  LCL NUM ^NFO ^FFO ^IFO ^MFO
+  LCL NUM ^X ^Y
+  LCL NUM ^U ^V
+
+  ^Z == @Z( ^Z )
+  ^F == @F( ^F )
+
+  ^X == 1
+  ^Y == MTF_1FLD( ^Z, ^F, ^Q, ^A, ^N, ^MTF, 'DIF', 'SIN' )
+
+  ^NFO == (NFO Z^Z)
+  ^FFO == (FFO Z^Z)
+  ^IFO == (IFO Z^Z)
+
+  FOR ^MFO 1 ^NFO
+    IF ^Y < ^MTF(1,^MFO)
+      ^X == ^MFO
+      ^Y == ^MTF(1,^MFO)
+    END IF
+  END FOR
+
+  IF ^NFO > 2
+    ^X == @MIX( ^X, 2, ^NFO - 1 )
+    ^Y == ^MTF(1,^X)
+
+    ^U == ^MTF(1,^X-1) + ^MTF(1,^X+1) - ^Y * 2
+    ^V == ^MTF(1,^X-1) - ^MTF(1,^X+1)
+
+    ^ABC(0) ==-(^V**2  /^U/8)
+    ^ABC(1) == (^V*^IFO/^U/2)
+    ^ABC(2) == (^U/^IFO**2/2)
+  ELS
+    ^ABC(0) == 0
+    ^ABC(1) == 0
+    ^ABC(2) == 0
+  END IF
+
+  ^ABC(0) == ^ABC(0) + (^Y)
+  ^ABC(1) == ^ABC(1) + (^X - 1) * ^IFO + ^FFO
+END FCT ^ABC(@MIX( ^M, 0, 2 ))
+
+! Maximum   of through focus MTF curve
+FCT @MTFC( NUM ^Z, NUM ^F, NUM ^Q, NUM ^A, NUM ^N )
+END FCT @MTF( ^Z, ^F, ^Q, ^A, ^N, ^MTF, ^ABC, 0 )
+
+! Offset    of through focus MTF curve
+FCT @MTFB( NUM ^Z, NUM ^F, NUM ^Q, NUM ^A, NUM ^N )
+END FCT @MTF( ^Z, ^F, ^Q, ^A, ^N, ^MTF, ^ABC, 1 )
+
+! Curvature of through focus MTF curve
+FCT @MTFA( NUM ^Z, NUM ^F, NUM ^Q, NUM ^A, NUM ^N )
+END FCT @MTF( ^Z, ^F, ^Q, ^A, ^N, ^MTF, ^ABC, 2 )
+
+! Tangential MTF at image
+FCT @MTFT( NUM ^Z, NUM ^F, NUM ^Q, NUM ^N )
+  LCL NUM ^MTF(6)
+END FCT MTF_1FLD( @Z( ^Z ), @F( ^F ), ^Q, 90, ^N, ^MTF, 'DIF', 'SIN' )
+
+! Sagittal   MTF at image
+FCT @MTFS( NUM ^Z, NUM ^F, NUM ^Q, NUM ^N )
+  LCL NUM ^MTF(6)
+END FCT MTF_1FLD( @Z( ^Z ), @F( ^F ), ^Q, 00, ^N, ^MTF, 'DIF', 'SIN' )
+
+! Best focus position of wave front error
+FCT @BES( NUM ^Z, NUM ^W, NUM ^F, NUM ^N )
+  GBL NUM ^BES(10,27)
+  ^RTN == RMSWE( ^Z, ^W, ^N, ^BES, 'BES' )
+END FCT ^BES(7,^F)
+
+! Axial position of axial ray of pupil ^P
+FCT @A( NUM ^Z, NUM ^W, NUM ^P, NUM ^S )
+  LCL NUM ^R(4)
+  LCL NUM ^A
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^S == @S( ^S )
+
+  IF ^P
+    ^R(2) == ^P
+    IF RAYRSI( ^Z, ^W, 0, 0, ^R )
+      ^A == 0
+    ELS
+      ^A == -(Y S^S) * (N S^S) / (M S^S)
+    END IF
+  ELS
+    ^A == -(HMY Z^Z W^W S^S) / (UMY Z^Z W^W S^S)
+  END IF
+END FCT ^A
+
+! AXCL of wavelength W1 reference to wavelength W0
+^RTN == @FCT( '@AXCL( NUM ^Z, NUM ^P, NUM ^W1, NUM ^W0 )' )
+FCT @AXCL( NUM ^Z, NUM ^P, NUM ^W1, NUM ^W0 )
+END FCT @A( ^Z, ^W1, ^P, -1 ) - @A( ^Z, ^W0, ^P, -1 )
+
+! NUM > < BIT
+FCT @BIT( NUM ^N )
+  GBL NUM ^BIT(0..#2,0..01)
+  LCL NUM ^M
+
+  FOR ^M 1 #2 +1
+    IF 0 = ^BIT(^M,0)
+      ^BIT(^M,0) == 1
+    END IF
+  END FOR
+
+  ^BIT(0,0) == 1
+  FOR ^M ^BIT(0,1) 1 -1
+    ^BIT(0,0) == ^BIT(0,0) * ^BIT(^M,0)
+  END FOR
+  ^BIT(0,0) == ^BIT(0,0) - 1
+
+  IF ^N < 0
+    ^N == 0
+    FOR ^M ^BIT(0,1) 1 -1
+      ^N == (^N * ^BIT(^M,0)) + ^BIT(^M,1)
+    END FOR
+  ELS
+    FOR ^M 1 ^BIT(0,1) +1
+      ^BIT(^M,1) == MODF( ^N, ^BIT(^M,0) )
+      ^N == (^N - ^BIT(^M,1)) / ^BIT(^M,0)
+    END FOR
+    ^BIT(^M,1) == ^N
+  END IF
+END FCT ^N
+
+! NUM > < CLC
+FCT @CYC( NUM ^N )
+  GBL NUM ^CYC(0..#2,0..01)
+  LCL NUM ^M
+  LCL NUM ^L
+  LCL NUM ^A ^Z
+  LCL NUM ^I ^J
+
+  FOR ^M 1 #2 +1
+    ^CYC(^M,0) == ROUNDF( ^CYC(^M, 0) )
+    IF 0 = ^CYC(^M,0)
+      ^CYC(^M,0) == 1
+    END IF
+  END FOR
+
+  ^CYC(0,0) == 1
+  FOR ^M ^CYC(0,1) 1 -1
+    ^CYC(0,0) == ^CYC(0,0) * ^CYC(^M,0)
+  END FOR
+  ^CYC(0,0) == ^CYC(0,0) - 1
+
+  ^L == 0
+  FOR ^M 1 ^CYC(0,1)
+    IF ^CYC(^M,0) > 1
+      ^L == ^L + 1
+    END IF
+  END FOR
+
+  IF ^N < 0
+    ^A == 0
+    ^Z == ^A - 1
+    ^I == 1
+    ^J == ^CYC(0,1)
+    UNT
+      ^A == ^A + 1
+      ^Z == ^A - 1
+      ^I == 1
+      ^J == ^CYC(0,1)
+      WHI MODF( ^A, ^CYC(^I, 0) ) = ^CYC(^I,1)
+        ^I == ^I + 1
+      END WHI
+      WHI MODF( ^Z, ^CYC(^J, 0) ) = ^CYC(^J,1)
+        ^J == ^J - 1
+      END WHI
+    END UNT ^I > ^J
+    ^N == 1
+    FOR ^M 1 ^I-1
+      IF ^CYC(^M,0) > 1
+        ^N == ^N * ^A
+      END IF
+    END FOR
+    FOR ^M ^M ^CYC(0,1)
+      IF ^CYC(^M,0) > 1
+        ^N == ^N * ^Z
+      END IF
+    END FOR
+  ELS
+    ^Z == MODF( ^N, ^L )
+    ^A == (^N - ^Z) / ^L
+    ^I == 1
+    ^J == 1
+    WHI ^J < ^Z
+      IF ^CYC(^I,0) > 1
+        ^J == ^J + 1
+        ^CYC(^I,1) == ^A + 1
+      ELS
+        ^CYC(^I,1) == 00
+      END IF
+      ^I == ^I + 1
+    END WHI
+    UNT
+      IF ^CYC(^I,0) > 1
+        ^J == ^J + 1
+        ^CYC(^I,1) == ^A
+      ELS
+        ^CYC(^I,1) == 00
+      END IF
+      ^I == ^I + 1
+    END UNT ^I > ^CYC(0,1)
+  END IF
+END FCT ^N
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! -2**-2 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+^CDGM == @BUF
+BUF IMP B^CDGM CV_MACRO:CDGM.DAT
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+VER N;OUT N;BUF DEL B0;BUF Y;?CLS;BUF N;^OK == @CLS( 0, (BUF.TXT B0 I1) );OUT Y;VER Y
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+IF "RGX"=(INI)
+  CD RG_MACRO:
+    IN RGX.SEQ
+  CD ^CD
+END IF
+
+^GE == "IN GLASSEXPERT AUT '' USERINPUTS"
+^PUSH == 'BUF PUT IL+1'
+
+!svl all cvr
+
+FCT @PUSH( NUM ^N, STR ^S )
+  GBL NUM ^STACK_NUMBER(00..#2)
+  GBL STR ^STACK_STRING(00..#2)
+
+  LCL NUM ^POP
+  ^POP == ^STACK_NUMBER(00) + 1
+
+  ^STACK_NUMBER(^POP) == ^N
+  ^STACK_STRING(^POP) == ^S
+
+  ^STACK_NUMBER(00) == ^POP
+END FCT ^STACK_NUMBER(00)
+
+FCT @POP
+  GBL NUM ^STACK_NUMBER(00..#2)
+  GBL STR ^STACK_STRING(00..#2)
+
+  LCL NUM ^POP
+  ^POP == ^STACK_NUMBER(00)
+
+  ^STACK_NUMBER(00) == ^POP - 1
+END FCT ^STACK_NUMBER(^POP)
+
+FCT @FCT( STR ^KEY )
+  LCL STR ^FCT(00..#3)
+  LCL NUM ^LST
+  LCL NUM ^FND
+
+  IF '@' = SUBSTR( ^KEY, 1, 1 )
+    ^FCT(^LST) == ^KEY
+    ^LST == ^LST + 1
+  ELS
+    ^KEY == CONCAT( CONCAT( '@', UPCASE( ^KEY ) ), '(' )
+    ^FND == 0
+    WHI ^FND < ^LST AND 1 <> LOCSTR( ^FCT(^FND), ^KEY )
+      ^FND == ^FND + 1
+    END WHI
+    ^RTN == CVPUTREC( ^FCT(^FND) )
+  END IF
+END FCT ^FND
+
+FCT @OUT( NUM ^POP )
+  LCL NUM ^OUT(#2)
+  LCL NUM ^NUM
+  LCL NUM ^RTN
+
+  IF ^POP
+    ^RTN == ^OUT(^NUM)
+    ^NUM == ^NUM - 1
+  ELS
+    ^NUM == ^NUM + 1
+    ^OUT(^NUM) == (OUT)
+    ^RTN == ^OUT(^NUM)
+  END IF
+END FCT ^RTN
+
+FCT @VER( NUM ^POP )
+  LCL NUM ^VER(#2)
+  LCL NUM ^NUM
+  LCL NUM ^RTN
+
+  IF ^POP
+    ^RTN == ^VER(^NUM)
+    ^NUM == ^NUM - 1
+  ELS
+    ^NUM == ^NUM + 1
+    ^VER(^NUM) == (VER)
+    ^RTN == ^VER(^NUM)
+  END IF
+END FCT ^RTN
+
+!FCT @OUT
+!  GBL NUM ^OUT
+!  ^OUT == (OUT)
+!END FCT ^OUT
+!
+!FCT @VER
+!  GBL NUM ^VER
+!  ^VER == (VER)
+!END FCT ^VER
+
+FCT @LAG( NUM ^Z, NUM ^W )
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+END FCT ((HMY Z^Z W^W SI) * (UCY Z^Z W^W SI) - (HCY Z^Z W^W SI) * (UMY Z^Z W^W SI)) * (IND Z^Z W^W SI)
+
+!N CV_MACRO:FIFTHDEF.SEQ
+
+!^NRD == ROUNDF( 1 / ^DEL ) * 2
+! P = P1 + P2 - d*P1*P2 = P1 + P2*h
+
+! wri (pid)
+! wri (com)
+
+ver y
+out y
+exc y
+nab n
+rec y
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!WL  656 587 546 486 436
+!!WTW  10  27  29  23  11
+!!CLS WVL
+!!CLS?
+
+! Cache wave info into num array ^WTW (if ^RW is zero) & format them to cmd string ^WVW
+^RNT == @FCT( '@WVW( NUM ^RW )' )
+FCT @WVW( NUM ^RW )
+  GBL STR ^WVW(0..1,00..99) ^FMT
+  GBL NUM ^WTW(  21,00..99) ^NW
+
+  IF NOT ISFCT( 'FMT' )
+    RTN
+  END IF
+
+  ^NW == (NUM W)
+  IF ^RW
+    IF ^RW > 0
+      ^NW == ^RW
+    END IF
+    ^RW == 1
+  ELS
+    ^RW == 0
+
+    FOR ^W 1 ^NW
+      ^WTW(^W,00) == (WL      W^W)
+      IF (NUM Z) > 1
+      FOR ^Z 1 (NUM Z)
+      ^WTW(^W,^Z) == (WTW Z^Z W^W)
+      END FOR
+      ELS
+      ^WTW(^W,01) == (WTW     W^W)
+      END IF
+    END FOR
+  END IF
+
+  IF (NUM Z) > 1
+    ^WVW(^RW,00) == 'WL     '
+    FOR ^W 1 ^NW
+      ^RTN == @FMT( ' %9.4f'   , ^WTW(^W,00) )
+      ^WVW(^RW,00) == CONCAT( ^WVW(^RW,00), ^FMT )
+    END FOR
+
+    FOR ^Z 1 (NUM Z)
+    ^RTN == @FMT( ' Z%02d', ^Z )
+    ^WVW(^RW,^Z) == CONCAT( 'WTW', ^FMT )
+    FOR ^W 1 ^NW
+      ^RTN == @FMT( ' %4d     ', ^WTW(^W,^Z) )
+      ^WVW(^RW,^Z) == CONCAT( ^WVW(^RW,^Z), ^FMT )
+    END FOR
+    END FOR
+  ELS
+    ^WVW(^RW,00) == 'WL '
+    ^WVW(^RW,01) == 'WTW'
+    FOR ^W 1 ^NW
+      ^RTN == @FMT( ' %9.4f'   , ^WTW(^W,00) )
+      ^WVW(^RW,00) == CONCAT( ^WVW(^RW,00), ^FMT )
+      ^RTN == @FMT( ' %4d     ', ^WTW(^W,01) )
+      ^WVW(^RW,01) == CONCAT( ^WVW(^RW,01), ^FMT )
+    END FOR
+  END IF
+END FCT 0
+
+! Set single wavelength weight ^WTW for later called by @WVW( -1 )
+^RTN == @FCT( '@WTW( NUM ^V )' )
+FCT @WTW( NUM ^V )
+  ^V == ROUNDF( ^V )
+  FOR ^Z 1 (NUM Z)
+    FOR ^W 1 (NUM W)
+      ^WTW(^W,^Z) == 0
+    END FOR
+    ^WTW(^V,^Z) == 1
+  END FOR
+END FCT 0
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+^RTN == @FCT( '@Y( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )' )
+FCT @Y( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^RAY(4)
+  LCL NUM ^Y
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+
+  ^RAY(2) == ^R;IF RAYRSI( ^Z, ^W, ^F, ^S, ^RAY );^Y == 0;ELS;^Y == (Y);END IF
+END FCT ^Y
+
+^RTN == @FCT( '@X( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )' )
+FCT @X( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^RAY(4)
+  LCL NUM ^X
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+
+  ^RAY(1) == ^R;IF RAYRSI( ^Z, ^W, ^F, ^S, ^RAY );^X == 0;ELS;^X == (X);END IF
+END FCT ^X
+
+FCT @RY( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+END FCT @Y( ^Z, ^W, ^F, ^S, ^R ) - (Y Z^Z F^F R1)
+
+FCT @RX( NUM ^Z, NUM ^W, NUM ^F, NUM ^S, NUM ^R )
+END FCT @X( ^Z, ^W, ^F, ^S, ^R ) - (X Z^Z F^F R1)
+
+FCT @WY( NUM ^Z, NUM ^W1, NUM ^W0, NUM ^F, NUM ^S, NUM ^R )
+  LCL NUM ^RAY(4)
+  LCL NUM ^WY
+
+  ^Z == @Z( ^Z )
+  ^W1== @W( ^W1)
+  ^W0== @W( ^W0)
+  ^F == @F( ^F )
+
+  IF ^S
+    ^S == (STOP Z^Z)
+    ^R == ^R * (SD Z^Z S^S)
+  END IF
+
+  ^RAY(2) == ^R;IF RAYRSI( ^Z, ^W0, ^F, ^S, ^RAY );^WY == 0;ELS;^WY == (Y)      ;END IF
+  ^RAY(2) == ^R;IF RAYRSI( ^Z, ^W1, ^F, ^S, ^RAY );^WY == 0;ELS;^WY == (Y) - ^WY;END IF
+END FCT ^WY
+
+! Error y of rays
+^RTN == @FCT( '@EY( NUM ^Z, NUM ^W, NUM ^F, NUM ^X, NUM ^Y )' )
+FCT @EY( NUM ^Z, NUM ^W, NUM ^F, NUM ^X, NUM ^Y )
+  LCL NUM ^RAY(4)
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  ^RAY(1) == ^X
+  ^RAY(2) == ^Y
+  ^BAD == RAYRSI( ^Z, ^W, ^F, 0, ^RAY )
+END FCT (Y) - (Y Z^Z F^F R1)
+
+! Error x of rays
+FCT @EX( NUM ^Z, NUM ^W, NUM ^F, NUM ^X, NUM ^Y )
+  LCL NUM ^RAY(4)
+
+  ^Z == @Z( ^Z )
+  ^W == @W( ^W )
+  ^F == @F( ^F )
+
+  ^RAY(1) == ^X
+  ^RAY(2) == ^Y
+  ^BAD == RAYRSI( ^Z, ^W, ^F, 0, ^RAY )
+END FCT (X) - (X Z^Z F^F R1)
+
+! Delta y of rays
+FCT @DY( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+END FCT (@EY( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) - @EY( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+
+! Delta x of rays
+FCT @DX( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+END FCT (@EX( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) - @EX( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+
+! Center y of rays
+FCT @CY( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+END FCT (@EY( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) + @EY( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+
+! Center x of rays
+FCT @CX( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+END FCT (@EX( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) + @EX( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+
+!!  
+!!  ! Y value relative to reference ray
+!!  ^RTN == @FCT( '@Y( NUM ^Z, NUM ^W, NUM ^F, NUM ^R )' )
+!!  FCT @Y( NUM ^Z, NUM ^W, NUM ^F, NUM ^R )
+!!    ^Z == @Z( ^Z )
+!!    ^W == @W( ^W )
+!!    ^F == @F( ^F )
+!!  END FCT (Y Z^Z W^W F^F R^R) - (Y Z^Z F^F R01)
+!!  
+!!  ! X value relative to reference ray
+!!  FCT @X( NUM ^Z, NUM ^W, NUM ^F, NUM ^R )
+!!    ^Z == @Z( ^Z )
+!!    ^W == @W( ^W )
+!!    ^F == @F( ^F )
+!!  END FCT (X Z^Z W^W F^F R^R) - (X Z^Z F^F R01)
+!!  
+!!  ! Error y of rays
+!!  ^RTN == @FCT( '@EY( NUM ^Z, NUM ^W, NUM ^F, NUM ^X, NUM ^Y )' )
+!!  FCT @EY( NUM ^Z, NUM ^W, NUM ^F, NUM ^X, NUM ^Y )
+!!    LCL NUM ^RAY(4)
+!!  
+!!    ^Z == @Z( ^Z )
+!!    ^W == @W( ^W )
+!!    ^F == @F( ^F )
+!!  
+!!    ^RAY(1) == ^X
+!!    ^RAY(2) == ^Y
+!!    ^BAD == RAYRSI( ^Z, ^W, ^F, 0, ^RAY )
+!!  END FCT (Y) - (Y Z^Z F^F R1)
+!!  
+!!  ! Error x of rays
+!!  FCT @EX( NUM ^Z, NUM ^W, NUM ^F, NUM ^X, NUM ^Y )
+!!    LCL NUM ^RAY(4)
+!!  
+!!    ^Z == @Z( ^Z )
+!!    ^W == @W( ^W )
+!!    ^F == @F( ^F )
+!!  
+!!    ^RAY(1) == ^X
+!!    ^RAY(2) == ^Y
+!!    ^BAD == RAYRSI( ^Z, ^W, ^F, 0, ^RAY )
+!!  END FCT (X) - (X Z^Z F^F R1)
+!!  
+!!  ! Delta y of rays
+!!  FCT @DY( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+!!  END FCT (@EY( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) - @EY( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+!!  
+!!  ! Delta x of rays
+!!  FCT @DX( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+!!  END FCT (@EX( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) - @EX( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+!!  
+!!  ! Center y of rays
+!!  FCT @CY( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+!!  END FCT (@EY( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) + @EY( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+!!  
+!!  ! Center x of rays
+!!  FCT @CX( NUM ^Z1, NUM ^W1, NUM ^F1, NUM ^X1, NUM ^Y1, NUM ^Z0, NUM ^W0, NUM ^F0, NUM ^X0, NUM ^Y0 )
+!!  END FCT (@EX( ^Z1, ^W1, ^F1, ^X1, ^Y1 ) + @EX( ^Z0, ^W0, ^F0, ^X0, ^Y0 )) / 2
+!!  
+
+^RTN == @FCT( '@ET( NUM ^Z, NUM ^S, NUM ^A, NUM ^B )' )
+FCT @ET( NUM ^Z, NUM ^S, NUM ^A, NUM ^B )
+  ^Z  == @Z( ^Z  )
+  ^S  == @S( ^S  )
+END FCT (CT Z^Z S^S) - SAGF( ^S, ^Z, 0, ^A ) + SAGF( ^S + 1, ^Z, 0, ^B )
